@@ -20,6 +20,8 @@ import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 
 import 'package:hiddify/features/log/data/log_data_providers.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
+import 'package:hiddify/features/profile/model/profile_entity.dart';
+import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/system_tray/notifier/system_tray_notifier.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
@@ -88,6 +90,29 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
 
   await _safeInit("active profile", () => container.read(activeProfileProvider.future), timeout: 1000);
   await _init("hiddify-core", () => container.read(hiddifyCoreServiceProvider).init());
+
+  // NetTest VPN v1.1: seed the built-in profile on first launch so the
+  // app works with zero setup. Best-effort and time-boxed — a failure
+  // here only means the stock add-profile flow remains available.
+  await _safeInit("nettest default profile", () async {
+    final prefs = container.read(sharedPreferencesProvider).requireValue;
+    if (prefs.getBool('nettest.seeded.v1') ?? false) return;
+    final repo = container.read(profileRepositoryProvider).requireValue;
+    final hasAny = await repo.watchHasAnyProfile().first.then((e) => e.getOrElse((_) => false));
+    if (hasAny) {
+      await prefs.setBool('nettest.seeded.v1', true);
+      return;
+    }
+    final freeProfiles = await container.read(freeProfilesNotifierProvider.future);
+    if (freeProfiles.isEmpty) return;
+    final first = freeProfiles.first;
+    final result = await repo
+        .upsertRemote(first.sublink, userOverride: UserOverride(name: first.title.en, updateInterval: 3))
+        .run();
+    if (result.isRight()) {
+      await prefs.setBool('nettest.seeded.v1', true);
+    }
+  }, timeout: 12000);
 
   if (!kIsWeb) {
     // await _safeInit(

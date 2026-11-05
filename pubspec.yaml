@@ -1,7 +1,7 @@
 name: hiddify
 description: Cross Platform Multi Protocol Proxy Frontend.
 publish_to: "none"
-version: 4.1.1+40101
+version: 1.1.0+40102
 
 environment:
   sdk: ^3.10.4
@@ -192,6 +192,10 @@ flutter:
     - family: Emoji
       fonts:
         - asset: assets/fonts/Emoji.ttf
+    - family: NotoSerifDisplay
+      fonts:
+        - asset: assets/fonts/NotoSerifDisplay-Italic.ttf
+          style: italic
 
 flutter_gen:
   output: lib/gen/
@@ -199,11 +203,11 @@ flutter_gen:
     flutter_svg: true
 
 flutter_native_splash:
-  color: "#ffffff"
+  color: "#0A0E27"
   image: assets/images/source/ic_launcher_splash.png
   android_gravity: center
   android_12:
-    color: "#ffffff"
+    color: "#0A0E27"
     image: assets/images/source/ic_launcher_foreground.png
 
 ffigen:

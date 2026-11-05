@@ -33,7 +33,16 @@ class ProfilesNotifier extends _$ProfilesNotifier with AppLogger {
   @override
   Stream<List<ProfileEntity>> build() {
     final sort = ref.watch(profilesSortNotifierProvider);
-    return _profilesRepo.watchAll(sort: sort.by, sortMode: sort.mode).map((event) => event.getOrElse((l) => throw l));
+    return _profilesRepo.watchAll(sort: sort.by, sortMode: sort.mode).map((event) => event.getOrElse((l) => throw l)).map((
+      list,
+    ) {
+      // NetTest VPN v1.1: the built-in NetTest profile is pinned first.
+      final idx = list.indexWhere((p) => p is RemoteProfileEntity && p.url.contains('working_app'));
+      if (idx <= 0) return list;
+      final copy = [...list];
+      final nettest = copy.removeAt(idx);
+      return [nettest, ...copy];
+    });
   }
 
   ProfileRepository get _profilesRepo => ref.read(profileRepositoryProvider).requireValue;

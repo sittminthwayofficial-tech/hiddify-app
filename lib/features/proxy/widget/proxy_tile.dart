@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
+import 'package:hiddify/features/nettest/nettest_providers.dart';
 import 'package:hiddify/features/proxy/active/ip_widget.dart';
 import 'package:hiddify/gen/fonts.gen.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
@@ -45,15 +46,34 @@ class ProxyTile extends HookConsumerWidget with PresLogger {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Column(
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (proxy.urlTestDelay != 0)
-            Text(
-              proxy.urlTestDelay > 65000 ? "×" : proxy.urlTestDelay.toString(),
-              style: TextStyle(color: delayColor(context, proxy.urlTestDelay)),
-            ),
-
-          if (proxy.download > 0) Text("⬩", style: Theme.of(context).textTheme.bodySmall),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (proxy.urlTestDelay != 0)
+                Text(
+                  proxy.urlTestDelay > 65000 ? "×" : proxy.urlTestDelay.toString(),
+                  style: TextStyle(color: delayColor(context, proxy.urlTestDelay)),
+                ),
+              if (proxy.download > 0) Text("⬩", style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+          // NetTest v1.1: star toggle — tap to star, tap again to unstar.
+          Consumer(
+            builder: (context, ref, _) {
+              final starred = ref.watch(nettestStarsProvider).contains(proxy.tag);
+              return IconButton(
+                icon: Icon(
+                  starred ? Icons.star_rounded : Icons.star_border_rounded,
+                  color: starred ? const Color(0xFFFFC94D) : theme.colorScheme.onSurfaceVariant,
+                ),
+                tooltip: starred ? 'Unstar' : 'Star',
+                onPressed: () => ref.read(nettestStarsProvider.notifier).toggle(proxy.tag),
+              );
+            },
+          ),
         ],
       ),
 

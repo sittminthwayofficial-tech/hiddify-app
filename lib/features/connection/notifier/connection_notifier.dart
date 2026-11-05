@@ -8,6 +8,7 @@ import 'package:hiddify/features/connection/data/connection_data_providers.dart'
 import 'package:hiddify/features/connection/data/connection_repository.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
+import 'package:hiddify/features/nettest/nettest_providers.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/hiddifycore/init_signal.dart';
@@ -84,6 +85,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
           await _connect();
         case Connected():
           // default:
+          NettestHooks.userDisconnectInitiated = true;
           await haptic.mediumImpact();
           await ref.read(Preferences.startedByUser.notifier).update(false);
           await _disconnect();
@@ -116,6 +118,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
       switch (value) {
         case Connected() || Connecting():
           loggy.debug("aborting connection");
+          NettestHooks.userDisconnectInitiated = true;
           await _disconnect();
         default:
       }
