@@ -5,6 +5,7 @@ import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/home/widget/connection_button.dart';
+import 'package:hiddify/features/nettest/nettest_servers_slivers.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/profile/widget/profile_tile.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_card.dart';
@@ -118,24 +119,32 @@ class HomePage extends HookConsumerWidget {
                           ),
                           _ => const Text(""),
                         },
-                        const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [ConnectionButton(), ActiveProxyDelayIndicator()],
-                                ),
-                              ),
-                              ActiveProxyFooter(),
-                            ],
+                        // NetTest VPN v1.1.1: the connect block keeps its
+                        // natural height (no SliverFillRemaining) so the
+                        // server list below starts on the first screen —
+                        // visible immediately at app open, no navigation,
+                        // no connect first (Alex's spec items 3/4/9).
+                        const SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.only(top: 56, bottom: 8),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ConnectionButton(),
+                                Gap(4),
+                                ActiveProxyDelayIndicator(),
+                                Gap(8),
+                                ActiveProxyFooter(),
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
+                    // NetTest VPN v1.1.1: the full server list on home —
+                    // STARRED → RECOMMEND → ALL SERVERS → NO REPLY,
+                    // export + dedication signature at the bottom.
+                    const NettestServersSlivers(),
                     // AsyncData() => switch (hasAnyProfile) {
                     //     AsyncData(value: true) => const EmptyActiveProfileHomeBody(),
                     //     _ => const EmptyProfilesHomeBody(),
