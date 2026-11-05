@@ -34,7 +34,7 @@ class ProxiesOverviewPage extends HookConsumerWidget {
           IconButton(
             icon: const Icon(Icons.ios_share_rounded),
             tooltip: 'Export ping logs',
-            onPressed: () => exportNettestLog(ref),
+            onPressed: () => exportNettestLog(context, ref),
           ),
           PopupMenuButton<ProxiesSort>(
             initialValue: sortBy,

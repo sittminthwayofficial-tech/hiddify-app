@@ -26,19 +26,26 @@ import 'package:sliver_tools/sliver_tools.dart';
 ///    over automatically once connected)
 ///  - order: ⭐ STARRED (his picks, always on top) → RECOMMEND (top 3
 ///    from on-device data) → the tested list fastest-first, all expanded
-///  - v1.2.1 (Alex, 2026-11-06): untested / no-reply servers are NOT
-///    rendered at all — a node joins the visible list automatically
-///    once it has a successful delay measurement (supersedes the v1.1
-///    item-9 "show no-reply greyed at the bottom" rule). Display-only:
-///    hidden nodes keep being delay-tested in the background, and the
+///  - v1.2.1 (Alex, 2026-11-06): ALL SERVERS renders only nodes whose
+///    latest delay test succeeded AND came back under 800 ms. Untested,
+///    no-reply and >=800 ms nodes are NOT rendered at all — a node
+///    joins (or rejoins) the visible list automatically when a later
+///    test lands under the threshold (supersedes the v1.1 item-9
+///    "show no-reply greyed at the bottom" rule). Display-only: hidden
+///    nodes keep being delay-tested in the background, and the
 ///    store/log/export still contain everything. STARRED stays visible
-///    even while one of his picks has no reply yet.
+///    regardless of delay — his picks are exempt from both filters.
 ///  - one-tap ping-log export + the Option-1 dedication signature at
 ///    the very bottom of the scroll
 class NettestServersSlivers extends HookConsumerWidget {
   const NettestServersSlivers({super.key});
 
   static bool _noReply(OutboundInfo i) => i.urlTestDelay == 0 || i.urlTestDelay > 65000;
+
+  /// v1.2.1: ALL SERVERS shows a node only when it has a successful
+  /// delay sample under Alex's 800 ms threshold.
+  static const int maxVisibleDelayMs = 800;
+  static bool _visibleInAll(OutboundInfo i) => !_noReply(i) && i.urlTestDelay < maxVisibleDelayMs;
 
   static int _byDelay(OutboundInfo a, OutboundInfo b) {
     final ai = _noReply(a) ? 1 << 30 : a.urlTestDelay;
@@ -117,8 +124,9 @@ class NettestServersSlivers extends HookConsumerWidget {
 
     final sectionTags = {...starredItems.map((i) => i.tag), ...recommendItems.map((i) => i.tag)};
     final rest = items.where((i) => !sectionTags.contains(i.tag)).toList();
-    // v1.2.1: untested / no-reply nodes are hidden (display filter only).
-    final mainItems = rest.where((i) => !_noReply(i)).toList();
+    // v1.2.1: untested / no-reply / >=800 ms nodes are hidden from
+    // ALL SERVERS (display filter only — testing continues regardless).
+    final mainItems = rest.where(_visibleInAll).toList();
 
     // ---- item 10: with another key active, his NetTest starred best-3
     // stays visible as a compact strip above everything.
@@ -247,7 +255,7 @@ class NettestServersSlivers extends HookConsumerWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
             child: FilledButton.icon(
-              onPressed: () => exportNettestLog(ref),
+              onPressed: () => exportNettestLog(context, ref),
               icon: const Icon(Icons.ios_share_rounded),
               label: const Text('Export ping logs'),
             ),

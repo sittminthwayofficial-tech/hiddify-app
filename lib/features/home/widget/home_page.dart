@@ -145,7 +145,7 @@ class HomePage extends HookConsumerWidget {
                     ),
                     // NetTest VPN v1.1.1: the server list on home —
                     // STARRED → RECOMMEND → ALL SERVERS (v1.2.1: only
-                    // tested nodes render; untested/no-reply are hidden),
+                    // tested nodes under 800 ms render; the rest hidden),
                     // export + dedication signature at the bottom.
                     const NettestServersSlivers(),
                     // AsyncData() => switch (hasAnyProfile) {

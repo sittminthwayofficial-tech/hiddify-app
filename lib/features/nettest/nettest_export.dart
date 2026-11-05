@@ -1,14 +1,31 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:hiddify/features/nettest/nettest_providers.dart';
 import 'package:hiddify/features/nettest/nettest_store.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-/// NetTest VPN v1.1 — one-tap ping-log export (spec items 1, 12).
+/// NetTest VPN — one-tap ping-log export (spec items 1, 12).
 /// Composes the on-device log (stars, delay tests, per-session quality
 /// records, aggregates, current RECOMMEND) into a .txt and opens the
-/// Android share sheet. Best-effort: any failure ends silently.
+/// Android share sheet.
+///
+/// v1.2.1 — NEVER SILENT (device defect on a fresh-installed 1.2.0:
+/// tapping Export produced nothing at all — no sheet, no file). The old
+/// implementation wrapped the whole flow in one blanket try/catch
+/// ("best-effort"), so ANY throw — store read, file write, or the
+/// share_plus call — degraded to invisible nothing. The ladder now is:
+///   1. compose defensively: if the store cannot be read, the export
+///      still produces a file with headers + "no data yet";
+///   2. write the .txt to a user-visible location (external files dir,
+///      then app documents, then temp);
+///   3. open the share sheet (share_plus 10 API, legacy API as backup);
+///   4. if sharing fails, keep the saved file and show a SnackBar with
+///      its full path — the tap always produces visible feedback.
+/// Still fully inside the isolated nettest layer (spec item 12): a
+/// failure here can never affect connecting or the core.
 
 String _fmtBytes(int b) {
   if (b < 1024) return '$b B';
@@ -20,6 +37,16 @@ String _fmtTime(int ms) {
   final d = DateTime.fromMillisecondsSinceEpoch(ms);
   String two(int v) => v.toString().padLeft(2, '0');
   return '${d.year}-${two(d.month)}-${two(d.day)} ${two(d.hour)}:${two(d.minute)}';
+}
+
+String _emptyLogText(String note) {
+  final buf = StringBuffer();
+  buf.writeln('NetTest VPN — Ping & Session Log');
+  buf.writeln('Exported: ${_fmtTime(DateTime.now().millisecondsSinceEpoch)}');
+  buf.writeln('');
+  buf.writeln('=== NO DATA YET ===');
+  buf.writeln(note);
+  return buf.toString();
 }
 
 String buildNettestLogText(NettestStore store) {
@@ -83,7 +110,7 @@ String buildNettestLogText(NettestStore store) {
   buf.writeln('=== PER-NODE SUMMARY (all time, never auto-deleted) ===');
   if (aggregates.isEmpty) buf.writeln('(none)');
   aggregates.forEach((tag, raw) {
-    final a = raw as Map;
+    final a = raw is Map ? raw : const {};
     buf.writeln(
       '$tag — sessions ${a['sessions']}, connected ${a['ok']}, good ${a['good']}, bad ${a['bad']}, '
       'traffic ${_fmtBytes((a['down'] as num? ?? 0).toInt())} down / ${_fmtBytes((a['up'] as num? ?? 0).toInt())} up, drops ${a['drops']}',
@@ -100,15 +127,96 @@ String buildNettestLogText(NettestStore store) {
   return buf.toString();
 }
 
-/// One tap → share sheet with the log file attached.
-Future<void> exportNettestLog(WidgetRef ref) async {
+/// One tap → share sheet with the log file attached; if the sheet
+/// cannot be opened, the file is saved to a visible location and a
+/// SnackBar says where. Never silent (v1.2.1).
+Future<void> exportNettestLog(BuildContext context, WidgetRef ref) async {
+  // ---- 1) compose (defensive: even a broken store yields a file)
+  var text = '';
   try {
-    final store = ref.read(nettestStoreProvider);
-    final text = buildNettestLogText(store);
-    final file = File('${Directory.systemTemp.path}/nettest_ping_log.txt');
-    await file.writeAsString(text);
-    await Share.shareXFiles([XFile(file.path, mimeType: 'text/plain')]);
-  } catch (_) {
-    // Best-effort only (spec item 12).
+    NettestStore? store;
+    try {
+      store = ref.read(nettestStoreProvider);
+    } catch (_) {
+      store = null;
+    }
+    if (store == null) {
+      text = _emptyLogText('No tests or sessions recorded yet (log store unavailable).');
+    } else {
+      try {
+        text = buildNettestLogText(store);
+      } catch (e) {
+        text = _emptyLogText('No tests or sessions recorded yet (log read failed: $e).');
+      }
+    }
+  } catch (e) {
+    text = _emptyLogText('No tests or sessions recorded yet ($e).');
+  }
+  if (text.trim().isEmpty) {
+    text = _emptyLogText('No tests or sessions recorded yet.');
+  }
+
+  // ---- 2) write the .txt (visible dir first)
+  File? file;
+  final dirs = <Directory?>[];
+  try {
+    dirs.add(await getExternalStorageDirectory());
+  } catch (_) {}
+  try {
+    dirs.add(await getApplicationDocumentsDirectory());
+  } catch (_) {}
+  dirs.add(Directory.systemTemp);
+  for (final dir in dirs) {
+    if (dir == null) continue;
+    try {
+      final f = File('${dir.path}/nettest_ping_log.txt');
+      await f.writeAsString(text, flush: true);
+      file = f;
+      break;
+    } catch (_) {}
+  }
+
+  // ---- 3) share sheet (modern API, legacy backup)
+  Object? shareError;
+  var shared = false;
+  if (file != null) {
+    try {
+      final result = await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'text/plain')],
+          subject: 'NetTest VPN — ping log',
+        ),
+      );
+      // A dismissed sheet still means the tap worked (user's choice).
+      shared = result.status != ShareResultStatus.unavailable;
+    } catch (e) {
+      shareError = e;
+      try {
+        await Share.shareXFiles([XFile(file!.path, mimeType: 'text/plain')]);
+        shared = true;
+      } catch (e2) {
+        shareError = e2;
+      }
+    }
+  }
+
+  // ---- 4) never silent: announce the saved fallback
+  if (!shared && context.mounted) {
+    try {
+      if (file != null && shareError != null) {
+        // Annotate the saved copy so a future failure is diagnosable
+        // from the file itself when Alex sends it over.
+        try {
+          await file.writeAsString('share error: $shareError\n\n$text', flush: true);
+        } catch (_) {}
+      }
+      final where = file != null ? file.path : 'nowhere — saving failed ($shareError)';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Share unavailable — ping log saved to: $where'),
+          duration: const Duration(seconds: 10),
+        ),
+      );
+    } catch (_) {}
   }
 }
