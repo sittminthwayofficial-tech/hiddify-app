@@ -25,8 +25,14 @@ import 'package:sliver_tools/sliver_tools.dart';
 ///    from the active profile's generated config; live core data takes
 ///    over automatically once connected)
 ///  - order: ⭐ STARRED (his picks, always on top) → RECOMMEND (top 3
-///    from on-device data) → the full list fastest-first → no-reply
-///    greyed at the end; nothing hidden behind a tap, all expanded
+///    from on-device data) → the tested list fastest-first, all expanded
+///  - v1.2.1 (Alex, 2026-11-06): untested / no-reply servers are NOT
+///    rendered at all — a node joins the visible list automatically
+///    once it has a successful delay measurement (supersedes the v1.1
+///    item-9 "show no-reply greyed at the bottom" rule). Display-only:
+///    hidden nodes keep being delay-tested in the background, and the
+///    store/log/export still contain everything. STARRED stays visible
+///    even while one of his picks has no reply yet.
 ///  - one-tap ping-log export + the Option-1 dedication signature at
 ///    the very bottom of the scroll
 class NettestServersSlivers extends HookConsumerWidget {
@@ -111,7 +117,7 @@ class NettestServersSlivers extends HookConsumerWidget {
 
     final sectionTags = {...starredItems.map((i) => i.tag), ...recommendItems.map((i) => i.tag)};
     final rest = items.where((i) => !sectionTags.contains(i.tag)).toList();
-    final noReplyItems = rest.where(_noReply).toList();
+    // v1.2.1: untested / no-reply nodes are hidden (display filter only).
     final mainItems = rest.where((i) => !_noReply(i)).toList();
 
     // ---- item 10: with another key active, his NetTest starred best-3
@@ -171,13 +177,12 @@ class NettestServersSlivers extends HookConsumerWidget {
       );
     }
 
-    Widget tileFor(OutboundInfo item, {bool greyed = false}) {
-      final tile = ProxyTile(
+    Widget tileFor(OutboundInfo item) {
+      return ProxyTile(
         item,
         selected: selectedTag == item.tag,
         onTap: () => onTapItem(item),
       );
-      return greyed ? Opacity(opacity: 0.5, child: tile) : tile;
     }
 
     if (items.isEmpty && importedStrip.isEmpty) {
@@ -238,13 +243,6 @@ class NettestServersSlivers extends HookConsumerWidget {
           itemCount: mainItems.length,
           itemBuilder: (context, index) => tileFor(mainItems[index]),
         ),
-        if (noReplyItems.isNotEmpty) ...[
-          SliverToBoxAdapter(child: sectionHeader('NO REPLY / NOT TESTED YET')),
-          SliverList.builder(
-            itemCount: noReplyItems.length,
-            itemBuilder: (context, index) => tileFor(noReplyItems[index], greyed: true),
-          ),
-        ],
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
