@@ -1,16 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- NetTest VPN Android 12+ splash icon: identical art to the
-     adaptive foreground (white bolt + teal dot inside the safe
-     zone) so the system splash renders it modestly at any size. -->
+<!-- NetTest VPN adaptive icon foreground / Android 12 splash art:
+     white bolt + teal dot, mapped into the central 72dp of the 108dp
+     grid (p' = 18 + 72p) so the mark sits inside the 66% safe-zone
+     circle at any size.
+     v1.3 polish (Alex feedback item 3): SAME colours and shape —
+     rendering quality only: two soft halo copies behind the bolt, a
+     faint glow ring behind the dot, and a lighter core in the dot,
+     so the emblem reads crisp and rich instead of flat. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <group
+        android:pivotX="54.5"
+        android:pivotY="54.1"
+        android:scaleX="1.13"
+        android:scaleY="1.13">
+        <path
+            android:pathData="M57.2,24.1 L37.6,57.7 L49.5,57.7 L45.2,84.1 L71.4,48.4 L59.0,48.4 Z"
+            android:fillColor="#1AFFFFFF"/>
+    </group>
+    <group
+        android:pivotX="54.5"
+        android:pivotY="54.1"
+        android:scaleX="1.06"
+        android:scaleY="1.06">
+        <path
+            android:pathData="M57.2,24.1 L37.6,57.7 L49.5,57.7 L45.2,84.1 L71.4,48.4 L59.0,48.4 Z"
+            android:fillColor="#30FFFFFF"/>
+    </group>
     <path
         android:pathData="M57.2,24.1 L37.6,57.7 L49.5,57.7 L45.2,84.1 L71.4,48.4 L59.0,48.4 Z"
         android:fillColor="#FFFFFF"/>
     <path
+        android:pathData="M65.5,31.3 a5.4,5.4 0 1,0 10.8,0 a5.4,5.4 0 1,0 -10.8,0 Z"
+        android:fillColor="#4D2ED3A6"/>
+    <path
         android:pathData="M67.7,31.3 a3.24,3.24 0 1,0 6.48,0 a3.24,3.24 0 1,0 -6.48,0 Z"
         android:fillColor="#2ED3A6"/>
+    <path
+        android:pathData="M68.8,30.5 a1.4,1.4 0 1,0 2.8,0 a1.4,1.4 0 1,0 -2.8,0 Z"
+        android:fillColor="#8FF5D2"/>
 </vector>

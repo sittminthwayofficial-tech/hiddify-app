@@ -1,5 +1,6 @@
 import 'package:dartx/dartx.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
@@ -35,10 +36,19 @@ import 'package:sliver_tools/sliver_tools.dart';
 ///    nodes keep being delay-tested in the background, and the
 ///    store/log/export still contain everything. STARRED stays visible
 ///    regardless of delay — his picks are exempt from both filters.
-///  - one-tap ping-log export + the Option-1 dedication signature at
-///    the very bottom of the scroll
+///  - one-tap ping-log export + the Option-1 dedication signature
+///  - v1.3 (Alex, 2026-11-06 01:09): ALL SERVERS is collapsible —
+///    collapsed it shows only the best 5 (RECOMMEND picks are already
+///    excluded above, so nothing duplicates), the rest sit behind a
+///    "Show all servers" flip row; expanded shows everything with a
+///    "Show less" flip row. The dedication signature sits directly
+///    below the flip row when collapsed and travels to the very
+///    bottom of the full list when expanded.
 class NettestServersSlivers extends HookConsumerWidget {
   const NettestServersSlivers({super.key});
+
+  /// v1.3: how many ALL SERVERS rows show in the collapsed state.
+  static const int collapsedCount = 5;
 
   static bool _noReply(OutboundInfo i) => i.urlTestDelay == 0 || i.urlTestDelay > 65000;
 
@@ -126,7 +136,12 @@ class NettestServersSlivers extends HookConsumerWidget {
     final rest = items.where((i) => !sectionTags.contains(i.tag)).toList();
     // v1.2.1: untested / no-reply / >=800 ms nodes are hidden from
     // ALL SERVERS (display filter only — testing continues regardless).
-    final mainItems = rest.where(_visibleInAll).toList();
+    final mainItems = rest.where(_visibleInAll).toList()..sort(_byDelay);
+    // v1.3: collapsed shows only the best [collapsedCount] of those.
+    final expanded = useState(false);
+    final hasMore = mainItems.length > collapsedCount;
+    final visibleMainItems =
+        (expanded.value || !hasMore) ? mainItems : mainItems.sublist(0, collapsedCount);
 
     // ---- item 10: with another key active, his NetTest starred best-3
     // stays visible as a compact strip above everything.
@@ -193,6 +208,48 @@ class NettestServersSlivers extends HookConsumerWidget {
       );
     }
 
+    // v1.3: the flip row under ALL SERVERS — a full-width violet
+    // outline pill; the chevron flips with the state (Alex's mock).
+    Widget flipRow() {
+      final isOpen = expanded.value;
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(28),
+            onTap: () => expanded.value = !isOpen,
+            child: Container(
+              height: 54,
+              decoration: BoxDecoration(
+                border: Border.all(color: nettestViolet, width: 1.6),
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    isOpen ? 'Show less' : 'Show all servers',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                  const Gap(6),
+                  Icon(
+                    isOpen ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     if (items.isEmpty && importedStrip.isEmpty) {
       return SliverToBoxAdapter(
         child: Padding(
@@ -248,12 +305,19 @@ class NettestServersSlivers extends HookConsumerWidget {
         ],
         SliverToBoxAdapter(child: sectionHeader('ALL SERVERS')),
         SliverList.builder(
-          itemCount: mainItems.length,
-          itemBuilder: (context, index) => tileFor(mainItems[index]),
+          itemCount: visibleMainItems.length,
+          itemBuilder: (context, index) => tileFor(visibleMainItems[index]),
         ),
+        // v1.3: flip row (only when there is anything more to show),
+        // then the signature directly below it — collapsed it sits
+        // right under the expander; expanded it lands at the very
+        // bottom of the full list (Alex, 2026-11-06 01:09). The
+        // export button keeps its place under the signature.
+        if (hasMore) SliverToBoxAdapter(child: flipRow()),
+        const SliverToBoxAdapter(child: DedicationSignature()),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: FilledButton.icon(
               onPressed: () => exportNettestLog(context, ref),
               icon: const Icon(Icons.ios_share_rounded),
@@ -261,7 +325,6 @@ class NettestServersSlivers extends HookConsumerWidget {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: DedicationSignature()),
         const SliverToBoxAdapter(child: SizedBox(height: 84)),
       ],
     );

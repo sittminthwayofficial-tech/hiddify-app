@@ -39,8 +39,39 @@ class _BoltPainter extends CustomPainter {
       path.lineTo(p.dx, p.dy);
     }
     path.close();
-    canvas.drawPath(path, Paint()..color = nettestViolet);
-    canvas.drawCircle(Offset(cx + 0.21 * s, cy - 0.30 * s), 0.045 * s, Paint()..color = nettestTeal);
+    // NetTest VPN v1.3 (feedback item 3): same shape, same colours —
+    // quality polish only: a faint same-hue glow behind the bolt, a
+    // subtle vertical sheen across it, and a lighter core in the dot,
+    // so the emblem renders crisp and rich instead of flat.
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = nettestViolet.withValues(alpha: 0.45)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 0.05 * s),
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF9A75FF), nettestViolet],
+        ).createShader(path.getBounds()),
+    );
+    final dotC = Offset(cx + 0.21 * s, cy - 0.30 * s);
+    canvas.drawCircle(
+      dotC,
+      0.075 * s,
+      Paint()
+        ..color = nettestTeal.withValues(alpha: 0.30)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 0.04 * s),
+    );
+    canvas.drawCircle(dotC, 0.045 * s, Paint()..color = nettestTeal);
+    canvas.drawCircle(
+      dotC.translate(-0.013 * s, -0.013 * s),
+      0.018 * s,
+      Paint()..color = const Color(0xFF8FF5D2),
+    );
   }
 
   @override
@@ -64,15 +95,21 @@ class _Diamond extends StatelessWidget {
 /// The static splash composition: glow, gold-ringed bolt emblem,
 /// "NETTEST VPN" below the ring, gold rules + diamond, and the one
 /// animated element — the dedication line sliding up into place.
+///
+/// NetTest VPN v1.3 (feedback item 4): the line's motion is driven by
+/// its own [lineAnimation] and applied through an AnimatedBuilder whose
+/// child (the line's Text) is built ONCE — per frame only a translate +
+/// opacity wrapper rebuilds, and the static composition above is never
+/// repainted, so the slide is a continuous 60 fps motion instead of
+/// the old whole-tree rebuild that stuttered on device.
 class DedicationSplash extends StatelessWidget {
-  const DedicationSplash({super.key, required this.lineProgress});
+  const DedicationSplash({super.key, required this.lineAnimation});
 
-  /// 0..1 — progress of the dedication line's slow slide + fade.
-  final double lineProgress;
+  /// 0..1 (already eased) — progress of the dedication line's slide + fade.
+  final Animation<double> lineAnimation;
 
   @override
   Widget build(BuildContext context) {
-    final p = Curves.easeOutCubic.transform(lineProgress.clamp(0, 1));
     // NetTest VPN v1.2 — responsive: the locked composition is scaled
     // by the screen's shortest side (design baseline 400dp) and capped,
     // so it sits centered and proportionate on small phones and
@@ -141,22 +178,26 @@ class DedicationSplash extends StatelessWidget {
                     SizedBox(height: 14 * s),
                     SizedBox(
                       height: 44 * s,
-                      child: Transform.translate(
-                        offset: Offset(0, 40 * s * (1 - p)),
-                        child: Opacity(
-                          opacity: p,
-                          child: Text(
-                            dedicationText,
-                            style: TextStyle(
-                              fontFamily: dedicationFontFamily,
-                              fontStyle: FontStyle.italic,
-                              color: nettestGold,
-                              fontSize: 29 * s,
-                              letterSpacing: 1.2 * s * p,
-                              decoration: TextDecoration.none,
-                            ),
+                      child: AnimatedBuilder(
+                        animation: lineAnimation,
+                        child: Text(
+                          dedicationText,
+                          style: TextStyle(
+                            fontFamily: dedicationFontFamily,
+                            fontStyle: FontStyle.italic,
+                            color: nettestGold,
+                            fontSize: 29 * s,
+                            letterSpacing: 1.2 * s,
+                            decoration: TextDecoration.none,
                           ),
                         ),
+                        builder: (context, child) {
+                          final p = lineAnimation.value.clamp(0, 1).toDouble();
+                          return Transform.translate(
+                            offset: Offset(0, 40 * s * (1 - p)),
+                            child: Opacity(opacity: p, child: child),
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -182,19 +223,34 @@ class NettestSplashGate extends StatefulWidget {
   State<NettestSplashGate> createState() => _NettestSplashGateState();
 }
 
-class _NettestSplashGateState extends State<NettestSplashGate> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+class _NettestSplashGateState extends State<NettestSplashGate> with TickerProviderStateMixin {
+  /// Overall gate timing: fade-out window + dismissal, as before.
+  late final AnimationController _gate;
+
+  /// NetTest VPN v1.3 (feedback item 4): the dedication line gets its
+  /// OWN controller — 1.5 s, easeOutCubic, started after the first
+  /// frame so it never competes with the startup-heavy first build.
+  /// The splash composition is passed to the gate's AnimatedBuilder as
+  /// its cached child, so per-frame work is two opacity/transform
+  /// wrappers only — the slide runs at a continuous 60 fps.
+  late final AnimationController _line;
+  late final Animation<double> _lineAnim;
   Timer? _fallback;
   bool _gone = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2900));
-    _controller.addStatusListener((status) {
+    _gate = AnimationController(vsync: this, duration: const Duration(milliseconds: 2900));
+    _gate.addStatusListener((status) {
       if (status == AnimationStatus.completed) _dismiss();
     });
-    _controller.forward();
+    _line = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500));
+    _lineAnim = CurvedAnimation(parent: _line, curve: Curves.easeOutCubic);
+    _gate.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _line.forward();
+    });
     _fallback = Timer(const Duration(seconds: 4), _dismiss);
   }
 
@@ -206,7 +262,8 @@ class _NettestSplashGateState extends State<NettestSplashGate> with SingleTicker
   @override
   void dispose() {
     _fallback?.cancel();
-    _controller.dispose();
+    _gate.dispose();
+    _line.dispose();
     super.dispose();
   }
 
@@ -219,14 +276,14 @@ class _NettestSplashGateState extends State<NettestSplashGate> with SingleTicker
         Positioned.fill(
           child: AbsorbPointer(
             child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) {
-                final v = _controller.value;
+              animation: _gate,
+              child: DedicationSplash(lineAnimation: _lineAnim),
+              builder: (context, child) {
+                final v = _gate.value;
                 final gateOpacity = v < 0.88 ? 1.0 : 1.0 - ((v - 0.88) / 0.12);
-                final lineProgress = ((v - 0.08) / 0.78).clamp(0, 1).toDouble();
                 return Opacity(
                   opacity: gateOpacity.clamp(0, 1),
-                  child: DedicationSplash(lineProgress: lineProgress),
+                  child: child,
                 );
               },
             ),
@@ -237,8 +294,13 @@ class _NettestSplashGateState extends State<NettestSplashGate> with SingleTicker
   }
 }
 
-/// Option-1 footer signature for the servers view:
-/// ◆ ——— *A gift for Daw Thae* ——— ◆
+/// Option-1 footer signature for the servers view.
+///
+/// NetTest VPN v1.3 (Alex, 2026-11-06 01:11/01:14 — signature
+/// geometry): the same composition as the splash — two SHORT gold
+/// rules hugging ONE centre diamond on a line of their own, and the
+/// dedication text CLOSE under the rules (small gap). Not the old
+/// wide single row with the rules spread far apart.
 class DedicationSignature extends StatelessWidget {
   const DedicationSignature({super.key});
 
@@ -246,13 +308,21 @@ class DedicationSignature extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const _Diamond(size: 6),
-          const SizedBox(width: 12),
-          Container(width: 52, height: 1.1, color: nettestGold),
-          const SizedBox(width: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 64, height: 1.2, color: nettestGold),
+              const SizedBox(width: 12),
+              const _Diamond(size: 8),
+              const SizedBox(width: 12),
+              Container(width: 64, height: 1.2, color: nettestGold),
+            ],
+          ),
+          const SizedBox(height: 8),
           const Text(
             dedicationText,
             style: TextStyle(
@@ -263,10 +333,6 @@ class DedicationSignature extends StatelessWidget {
               decoration: TextDecoration.none,
             ),
           ),
-          const SizedBox(width: 16),
-          Container(width: 52, height: 1.1, color: nettestGold),
-          const SizedBox(width: 12),
-          const _Diamond(size: 6),
         ],
       ),
     );

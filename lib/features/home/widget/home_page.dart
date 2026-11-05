@@ -5,6 +5,7 @@ import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/home/widget/connection_button.dart';
+import 'package:hiddify/features/nettest/nettest_home_overlays.dart';
 import 'package:hiddify/features/nettest/nettest_layout.dart';
 import 'package:hiddify/features/nettest/nettest_servers_slivers.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
@@ -145,7 +146,8 @@ class HomePage extends HookConsumerWidget {
                     ),
                     // NetTest VPN v1.1.1: the server list on home —
                     // STARRED → RECOMMEND → ALL SERVERS (v1.2.1: only
-                    // tested nodes under 800 ms render; the rest hidden),
+                    // tested nodes under 800 ms render; the rest hidden;
+                    // v1.3: ALL SERVERS collapsible, best 5 by default),
                     // export + dedication signature at the bottom.
                     const NettestServersSlivers(),
                     // AsyncData() => switch (hasAnyProfile) {
@@ -158,6 +160,11 @@ class HomePage extends HookConsumerWidget {
                   ],
                 ),
               ),
+            // NetTest VPN v1.3: Home overlays — the Contact side pill +
+            // pop-out panel and the Message Box. Fully isolated,
+            // best-effort layers over the list (never in the connect
+            // path).
+            const Positioned.fill(child: NettestHomeOverlays()),
           ],
         ),
       ),

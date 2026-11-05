@@ -1,7 +1,7 @@
 name: hiddify
 description: Cross Platform Multi Protocol Proxy Frontend.
 publish_to: "none"
-version: 1.2.1+40105
+version: 1.3.0+40106
 
 environment:
   sdk: ^3.10.4
@@ -196,6 +196,15 @@ flutter:
       fonts:
         - asset: assets/fonts/NotoSerifDisplay-Italic.ttf
           style: italic
+    # NetTest VPN v1.3: Burmese notice text in the Message Box renders
+    # in Noto Sans Myanmar (Alex's locked rule: Myanmar messages use a
+    # Myanmar font).
+    - family: NotoSansMyanmar
+      fonts:
+        - asset: assets/fonts/NotoSansMyanmar-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/NotoSansMyanmar-Bold.ttf
+          weight: 700
 
 flutter_gen:
   output: lib/gen/
