@@ -104,8 +104,8 @@ class DedicationSplash extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(color: nettestGold, width: 1.6),
                   ),
-                  child: const Padding(
-                    padding: EdgeInsets.all(34),
+                  child: Padding(
+                    padding: const EdgeInsets.all(34),
                     child: CustomPaint(painter: _BoltPainter()),
                   ),
                 ),
