@@ -1,0 +1,104 @@
+name: Build NetTest VPN APK
+
+# Adapted from upstream hiddify/hiddify-app .github/workflows/build.yml
+# (android-apk job only). Differences vs upstream:
+#   - single Android APK job (no desktop/matrix, no test job)
+#   - CHANNEL=prod so the Makefile downloads the real hiddify-core release
+#     (dependencies.properties core.version) instead of the draft core
+#   - NO signing secrets step: without android/key.properties the upstream
+#     build.gradle automatically falls back to debug signing, so the APK is
+#     installable for sideload testing with zero setup.
+#   - artifacts kept 30 days (upstream keeps 1) so there is time to download.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+env:
+  IS_GITHUB_ACTIONS: 1
+  CHANNEL: "prod"
+  FLUTTER_VERSION: "3.38.5"
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Clean up disk space
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          rm -rf ~/.gradle/caches
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+          df -h
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2.21.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: "stable"
+          cache: true
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: "zulu"
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Setup dependencies
+        run: |
+          make android-apk-install-deps
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+
+      - name: Prepare (pub get, codegen, translations, core libs)
+        run: make android-apk-prepare
+
+      - name: Build APKs
+        env:
+          SENTRY_DSN: ""
+        run: make android-apk-release
+
+      - name: Collect APKs
+        run: |
+          mkdir -p out
+          ls -R ./build/app/outputs
+          cp ./build/app/outputs/flutter-apk/*arm64-v8a*.apk out/NetTest-VPN-arm64.apk || echo "no arm64 apk"
+          cp ./build/app/outputs/flutter-apk/*armeabi-v7a*.apk out/NetTest-VPN-arm7.apk || echo "no arm7 apk"
+          cp ./build/app/outputs/flutter-apk/*x86_64*.apk out/NetTest-VPN-x86_64.apk || echo "no x64 apk"
+          cp ./build/app/outputs/flutter-apk/app-release.apk out/NetTest-VPN-universal.apk || echo "no universal apk"
+          ls -la out
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nettest-vpn-apk
+          path: ./out
+          retention-days: 30
+
+      - name: Attach APKs to release (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./out/*.apk

@@ -88,8 +88,8 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                   localizationsDelegates: GlobalMaterialLocalizations.delegates,
                   debugShowCheckedModeBanner: false,
                   themeMode: themeMode.flutterThemeMode,
-                  theme: theme.lightTheme(lightColorScheme),
-                  darkTheme: theme.darkTheme(darkColorScheme),
+                  theme: theme.lightTheme(null),
+                  darkTheme: theme.darkTheme(null),
                   title: Constants.appName,
                   builder: (context, child) {
                     final theme = Theme.of(context);
@@ -150,8 +150,8 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
   //                         localizationsDelegates: GlobalMaterialLocalizations.delegates,
   //                         debugShowCheckedModeBanner: false,
   //                         material: (context, platform) => MaterialAppRouterData(
-  //                           theme: theme.lightTheme(lightColorScheme),
-  //                           darkTheme: theme.darkTheme(darkColorScheme),
+  //                           theme: theme.lightTheme(null),
+  //                           darkTheme: theme.darkTheme(null),
   //                           themeMode: themeMode.flutterThemeMode,
   //                         ),
   //                         cupertino: (context, platform) {

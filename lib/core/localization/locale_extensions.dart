@@ -6,7 +6,7 @@ import 'package:hiddify/gen/translations.g.dart';
 
 extension AppLocaleX on AppLocale {
   String get preferredFontFamily =>
-      this == AppLocale.fa ? FontFamily.shabnam : (kIsWeb || !Platform.isWindows ? "" : FontFamily.emoji);
+      this == AppLocale.fa ? FontFamily.shabnam : (kIsWeb || !Platform.isWindows ? FontFamily.manrope : FontFamily.emoji);
 
   String get localeName => switch (flutterLocale.toString()) {
     "ar" => "العربية",
