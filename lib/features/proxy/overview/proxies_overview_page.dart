@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/features/nettest/nettest_export.dart';
+import 'package:hiddify/features/nettest/nettest_layout.dart';
 import 'package:hiddify/features/nettest/nettest_servers_slivers.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -55,10 +56,15 @@ class ProxiesOverviewPage extends HookConsumerWidget {
               child: const Icon(FluentIcons.flash_24_filled),
             )
           : null,
-      body: const CustomScrollView(
-        slivers: [
-          NettestServersSlivers(),
-        ],
+      // NetTest VPN v1.2: same centered, width-capped column as home —
+      // rows never stretch edge-to-edge on tablets (patch list item d).
+      body: nettestCenteredColumn(
+        context,
+        child: const CustomScrollView(
+          slivers: [
+            NettestServersSlivers(),
+          ],
+        ),
       ),
     );
   }

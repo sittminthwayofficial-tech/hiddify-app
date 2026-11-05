@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- NetTest VPN adaptive icon monochrome layer (themed icons):
+     same safe-zone geometry as the foreground, single color. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M57.2,24.1 L37.6,57.7 L49.5,57.7 L45.2,84.1 L71.4,48.4 L59.0,48.4 Z"
+        android:fillColor="#FFFFFF"/>
+    <path
+        android:pathData="M67.7,31.3 a3.24,3.24 0 1,0 6.48,0 a3.24,3.24 0 1,0 -6.48,0 Z"
+        android:fillColor="#FFFFFF"/>
+</vector>

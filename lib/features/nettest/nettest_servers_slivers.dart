@@ -94,6 +94,21 @@ class NettestServersSlivers extends HookConsumerWidget {
           .whereType<OutboundInfo>()
           .toList();
     }
+    // ---- v1.2 RECOMMEND honesty: until at least one recommended node
+    // has a completed recorded session behind it, the picks come from
+    // the app's own delay tests only — say so in the header.
+    var recommendTestBased = false;
+    if (store != null && recommendItems.isNotEmpty) {
+      try {
+        final aggs = store.readAggregates();
+        recommendTestBased = !recommendItems.any(
+          (i) => ((aggs[i.tag] as Map?)?['sessions'] as num? ?? 0) > 0,
+        );
+      } catch (_) {
+        recommendTestBased = false;
+      }
+    }
+
     final sectionTags = {...starredItems.map((i) => i.tag), ...recommendItems.map((i) => i.tag)};
     final rest = items.where((i) => !sectionTags.contains(i.tag)).toList();
     final noReplyItems = rest.where(_noReply).toList();
@@ -123,7 +138,7 @@ class NettestServersSlivers extends HookConsumerWidget {
       } catch (_) {}
     }
 
-    Widget sectionHeader(String label, {IconData? icon, Color? color}) {
+    Widget sectionHeader(String label, {IconData? icon, Color? color, String? note}) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
         child: Row(
@@ -140,6 +155,17 @@ class NettestServersSlivers extends HookConsumerWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (note != null) ...[
+              const Gap(8),
+              Text(
+                note,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  letterSpacing: 0.8,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ],
         ),
       );
@@ -196,7 +222,11 @@ class NettestServersSlivers extends HookConsumerWidget {
         ],
         if (recommendItems.isNotEmpty) ...[
           SliverToBoxAdapter(
-            child: sectionHeader('RECOMMEND', icon: Icons.recommend_rounded),
+            child: sectionHeader(
+              'RECOMMEND',
+              icon: Icons.recommend_rounded,
+              note: recommendTestBased ? 'TEST-BASED' : null,
+            ),
           ),
           SliverList.builder(
             itemCount: recommendItems.length,

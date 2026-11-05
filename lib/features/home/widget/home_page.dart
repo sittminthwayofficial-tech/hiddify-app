@@ -5,6 +5,7 @@ import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/home/widget/connection_button.dart';
+import 'package:hiddify/features/nettest/nettest_layout.dart';
 import 'package:hiddify/features/nettest/nettest_servers_slivers.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/profile/widget/profile_tile.dart';
@@ -98,12 +99,13 @@ class HomePage extends HookConsumerWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: 600, // Set the maximum width here
-                ),
-                child: CustomScrollView(
+            // NetTest VPN v1.2: truly screen-centered column — capped
+            // at 600 and balanced against the shell's left rail, so
+            // the connect block + server list sit centered on phones
+            // and tablets (spec patch list item c).
+            nettestCenteredColumn(
+              context,
+              child: CustomScrollView(
                   slivers: [
                     // switch (activeProfile) {
                     // AsyncData(value: final profile?) =>
@@ -155,7 +157,6 @@ class HomePage extends HookConsumerWidget {
                   ],
                 ),
               ),
-            ),
           ],
         ),
       ),

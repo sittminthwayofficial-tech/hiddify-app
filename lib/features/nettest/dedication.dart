@@ -73,90 +73,99 @@ class DedicationSplash extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Curves.easeOutCubic.transform(lineProgress.clamp(0, 1));
-    return ColoredBox(
-      color: nettestNavy,
-      child: Stack(
-        children: [
-          // soft glow rings, centered a little above middle
-          Align(
-            alignment: const Alignment(0, -0.14),
-            child: Container(
-              width: 340,
-              height: 340,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [Color(0xFF161D42), Color(0xFF121838), Color(0x000A0E27)],
-                  stops: [0.45, 0.75, 1],
-                ),
-              ),
-            ),
-          ),
-          Align(
-            alignment: const Alignment(0, -0.14),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 148,
-                  height: 148,
-                  decoration: BoxDecoration(
+    // NetTest VPN v1.2 — responsive: the locked composition is scaled
+    // by the screen's shortest side (design baseline 400dp) and capped,
+    // so it sits centered and proportionate on small phones and
+    // tablets alike — never stretched, never clipped (patch list b).
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final s = (constraints.biggest.shortestSide / 400).clamp(0.72, 1.3).toDouble();
+        return ColoredBox(
+          color: nettestNavy,
+          child: Stack(
+            children: [
+              // soft glow rings, centered a little above middle
+              Align(
+                alignment: const Alignment(0, -0.14),
+                child: Container(
+                  width: 340 * s,
+                  height: 340 * s,
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: nettestGold, width: 1.6),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(34),
-                    child: CustomPaint(painter: _BoltPainter()),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'NETTEST VPN',
-                  style: TextStyle(
-                    color: nettestSoftViolet,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 8,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-                const SizedBox(height: 30),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(width: 74, height: 1.2, color: nettestGold),
-                    const SizedBox(width: 14),
-                    const _Diamond(size: 8),
-                    const SizedBox(width: 14),
-                    Container(width: 74, height: 1.2, color: nettestGold),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  height: 44,
-                  child: Transform.translate(
-                    offset: Offset(0, 40 * (1 - p)),
-                    child: Opacity(
-                      opacity: p,
-                      child: Text(
-                        dedicationText,
-                        style: TextStyle(
-                          fontFamily: dedicationFontFamily,
-                          fontStyle: FontStyle.italic,
-                          color: nettestGold,
-                          fontSize: 29,
-                          letterSpacing: 1.2 * p,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
+                    gradient: RadialGradient(
+                      colors: [Color(0xFF161D42), Color(0xFF121838), Color(0x000A0E27)],
+                      stops: [0.45, 0.75, 1],
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+              Align(
+                alignment: const Alignment(0, -0.14),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 148 * s,
+                      height: 148 * s,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: nettestGold, width: 1.6),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(34 * s),
+                        child: CustomPaint(painter: _BoltPainter()),
+                      ),
+                    ),
+                    SizedBox(height: 20 * s),
+                    Text(
+                      'NETTEST VPN',
+                      style: TextStyle(
+                        color: nettestSoftViolet,
+                        fontSize: 15 * s,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 8 * s,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                    SizedBox(height: 30 * s),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(width: 74 * s, height: 1.2, color: nettestGold),
+                        SizedBox(width: 14 * s),
+                        _Diamond(size: 8 * s),
+                        SizedBox(width: 14 * s),
+                        Container(width: 74 * s, height: 1.2, color: nettestGold),
+                      ],
+                    ),
+                    SizedBox(height: 14 * s),
+                    SizedBox(
+                      height: 44 * s,
+                      child: Transform.translate(
+                        offset: Offset(0, 40 * s * (1 - p)),
+                        child: Opacity(
+                          opacity: p,
+                          child: Text(
+                            dedicationText,
+                            style: TextStyle(
+                              fontFamily: dedicationFontFamily,
+                              fontStyle: FontStyle.italic,
+                              color: nettestGold,
+                              fontSize: 29 * s,
+                              letterSpacing: 1.2 * s * p,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

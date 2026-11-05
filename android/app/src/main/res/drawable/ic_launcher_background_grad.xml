@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- NetTest VPN adaptive icon background: navy -> violet diagonal
+     gradient (brand: #0D102B top-left to #1B1145 bottom-right,
+     same gradient as the legacy launcher art). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:startColor="#0D102B"
+        android:endColor="#1B1145"
+        android:angle="315"
+        android:type="linear" />
+</shape>

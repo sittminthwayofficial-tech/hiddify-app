@@ -5,9 +5,13 @@ name: Build NetTest VPN APK
 #   - single Android APK job (no desktop/matrix, no test job)
 #   - CHANNEL=prod so the Makefile downloads the real hiddify-core release
 #     (dependencies.properties core.version) instead of the draft core
-#   - NO signing secrets step: without android/key.properties the upstream
-#     build.gradle automatically falls back to debug signing, so the APK is
-#     installable for sideload testing with zero setup.
+#   - v1.2: RELEASE signing. The "Restore release keystore" step writes
+#     android/key.properties + the keystore from repository secrets
+#     (KEYSTORE_BASE64 / KEY_ALIAS / KEY_STORE_PASSWORD / KEY_PASSWORD),
+#     and the upstream build.gradle then signs the release build with
+#     Alex's permanent NetTest key (cert SHA-256 D3:52:DB:26:...:29:88).
+#     Without the secrets it would fall back to debug signing — the
+#     secrets are set, so shipped APKs are release-signed.
 #   - artifacts kept 30 days (upstream keeps 1) so there is time to download.
 
 on:
@@ -81,6 +85,26 @@ jobs:
 
       - name: Prepare (pub get, codegen, translations, core libs)
         run: make android-apk-prepare
+
+      - name: Restore release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::KEYSTORE_BASE64 secret is missing — refusing to ship a debug-signed build"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/nettest-release.jks
+          cat > android/key.properties <<EOF
+          storePassword=$KEY_STORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=nettest-release.jks
+          EOF
+          echo "keystore restored ($(stat -c%s android/app/nettest-release.jks) bytes), key.properties written"
 
       - name: Build APKs
         env:

@@ -5,6 +5,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/failures.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
+import 'package:hiddify/features/nettest/nettest_layout.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
 import 'package:hiddify/features/profile/overview/profiles_notifier.dart';
 import 'package:hiddify/features/profile/widget/profile_tile.dart';
@@ -47,11 +48,16 @@ class ProfilesPage extends HookConsumerWidget {
         icon: const Icon(Icons.add_rounded),
       ),
       body: asyncProfiles.when(
-        data: (data) => ListView.separated(
-          padding: const EdgeInsets.all(12).copyWith(bottom: 84),
-          separatorBuilder: (context, index) => const Gap(12),
-          itemBuilder: (context, index) => ProfileTile(profile: data[index]),
-          itemCount: data.length,
+        // NetTest VPN v1.2: profile tiles get the same centered,
+        // width-capped column as home/servers (patch list item d).
+        data: (data) => nettestCenteredColumn(
+          context,
+          child: ListView.separated(
+            padding: const EdgeInsets.all(12).copyWith(bottom: 84),
+            separatorBuilder: (context, index) => const Gap(12),
+            itemBuilder: (context, index) => ProfileTile(profile: data[index]),
+            itemCount: data.length,
+          ),
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) => Text(t.presentShortError(error)),
