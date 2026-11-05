@@ -21,7 +21,7 @@ import 'package:share_plus/share_plus.dart';
 ///      still produces a file with headers + "no data yet";
 ///   2. write the .txt to a user-visible location (external files dir,
 ///      then app documents, then temp);
-///   3. open the share sheet (share_plus 10 API, legacy API as backup);
+///   3. open the share sheet;
 ///   4. if sharing fails, keep the saved file and show a SnackBar with
 ///      its full path — the tap always produces visible feedback.
 /// Still fully inside the isolated nettest layer (spec item 12): a
@@ -176,27 +176,19 @@ Future<void> exportNettestLog(BuildContext context, WidgetRef ref) async {
     } catch (_) {}
   }
 
-  // ---- 3) share sheet (modern API, legacy backup)
+  // ---- 3) share sheet. NOTE: this project's resolved share_plus has
+  // no SharePlus/ShareParams API (v1.2.1's first build proved it at
+  // compile time) — the static Share API is what compiles and shipped
+  // in v1.1/v1.2. If it returns, the sheet was shown (a user dismissal
+  // is his choice, not a failure); if it throws, step 4 takes over.
   Object? shareError;
   var shared = false;
   if (file != null) {
     try {
-      final result = await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path, mimeType: 'text/plain')],
-          subject: 'NetTest VPN — ping log',
-        ),
-      );
-      // A dismissed sheet still means the tap worked (user's choice).
-      shared = result.status != ShareResultStatus.unavailable;
+      await Share.shareXFiles([XFile(file.path, mimeType: 'text/plain')]);
+      shared = true;
     } catch (e) {
       shareError = e;
-      try {
-        await Share.shareXFiles([XFile(file!.path, mimeType: 'text/plain')]);
-        shared = true;
-      } catch (e2) {
-        shareError = e2;
-      }
     }
   }
 
