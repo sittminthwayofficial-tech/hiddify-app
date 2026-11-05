@@ -28,10 +28,22 @@ import 'package:url_launcher/url_launcher.dart';
 ///    rail compensated, capped at the content column width — dark
 ///    navy surface, champagne-gold border, gold circle "!" badge,
 ///    two-line text. Content comes from feed/notices.json in the
-///    nettest repo, fetched once on app open (short timeout, silent
-///    on failure). A notice slides in, stays 5 seconds, and is shown
+///    nettest repo. A notice slides in, stays 5 seconds, and is shown
 ///    ONCE per notice ID — the seen ID is stored locally (00:24).
 ///    Burmese text renders in Noto Sans Myanmar, English in Manrope.
+///
+///    NetTest VPN v1.3.1 — pre-connect delivery (Alex, 2026-11-06
+///    02:25): the box UI and show-once behaviour above are unchanged;
+///    only the FETCH layer grew. On his network the raw GitHub route
+///    often only works once the VPN tunnel is up, so the box used to
+///    appear only after connecting. Now: (a) the last fetched notice
+///    is cached on-device and an unseen cached notice shows on Home
+///    open BEFORE any network result; (b) the live fetch tries the
+///    jsDelivr CDN mirror first, then raw GitHub (the raw copy is
+///    fresher — if it carries a different ID it is processed too);
+///    (c) if every source fails, the fetch retries at +15 s and
+///    +45 s; (d) the fetch re-runs whenever the app resumes. Still
+///    fully best-effort: every failure degrades silently.
 class NettestHomeOverlays extends StatefulWidget {
   const NettestHomeOverlays({super.key});
 
@@ -40,9 +52,15 @@ class NettestHomeOverlays extends StatefulWidget {
 }
 
 const _telegramUrl = 'https://t.me/kothuehtetaung';
-const _noticesUrl =
+// v1.3.1 dual source: jsDelivr CDN mirror first (reachable from
+// Myanmar without a VPN), raw GitHub second (fresher — it is the
+// origin the harvester/Alex pushes to).
+const _noticesUrlJsDelivr =
+    'https://cdn.jsdelivr.net/gh/sittminthwayofficial-tech/nettest@main/feed/notices.json';
+const _noticesUrlRaw =
     'https://raw.githubusercontent.com/sittminthwayofficial-tech/nettest/main/feed/notices.json';
 const _seenNoticeKey = 'nettest_notice_seen_id';
+const _noticeCacheKey = 'nettest_notice_cache';
 const _tgBlue = Color(0xFF2AABEE);
 const _panelNavy = Color(0xFF1E244C); // (30, 36, 76)
 const _boxNavy = Color(0xFF1A1F42);
@@ -94,7 +112,8 @@ Widget _telegramBadge(double size) {
   );
 }
 
-class _NettestHomeOverlaysState extends State<NettestHomeOverlays> with TickerProviderStateMixin {
+class _NettestHomeOverlaysState extends State<NettestHomeOverlays>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _panelCtrl;
   late final Animation<double> _panelAnim;
   late final AnimationController _noticeCtrl;
@@ -102,6 +121,8 @@ class _NettestHomeOverlaysState extends State<NettestHomeOverlays> with TickerPr
   bool _panelOpen = false;
   _Notice? _notice;
   Timer? _noticeTimer;
+  List<Timer> _noticeRetryTimers = [];
+  bool _checkingNotice = false;
 
   @override
   void initState() {
@@ -110,56 +131,150 @@ class _NettestHomeOverlaysState extends State<NettestHomeOverlays> with TickerPr
     _panelAnim = CurvedAnimation(parent: _panelCtrl, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
     _noticeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 380));
     _noticeAnim = CurvedAnimation(parent: _noticeCtrl, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkNotice());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _noticeTimer?.cancel();
+    for (final t in _noticeRetryTimers) {
+      t.cancel();
+    }
     _panelCtrl.dispose();
     _noticeCtrl.dispose();
     super.dispose();
   }
 
+  // v1.3.1: re-run the notice fetch whenever the app comes back to
+  // the foreground — a notice published while the app sat in the
+  // background lands without a cold start.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkNotice();
+    }
+  }
+
   // ------------------------------------------------------------------
-  // Message Box: one best-effort fetch on open; show once per ID, 5 s.
+  // Message Box fetch layer (v1.3.1): cache first, dual-source live
+  // fetch, +15 s / +45 s retries. Show once per ID, 5 s — unchanged.
   // ------------------------------------------------------------------
   Future<void> _checkNotice() async {
+    if (_checkingNotice) return;
+    _checkingNotice = true;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final seen = prefs.getString(_seenNoticeKey) ?? '';
-      final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
+      // 1. Cache first: a notice fetched during an earlier (possibly
+      //    connected) session shows pre-connect, before any network
+      //    result comes back.
       try {
-        final request = await client.getUrl(Uri.parse(_noticesUrl)).timeout(const Duration(seconds: 4));
-        final response = await request.close().timeout(const Duration(seconds: 4));
-        if (response.statusCode != 200) return;
-        final raw = await response.transform(utf8.decoder).join().timeout(const Duration(seconds: 4));
-        final decoded = jsonDecode(raw);
-        if (decoded is! Map) return;
-        final id = (decoded['id'] ?? '').toString().trim();
-        final title = (decoded['title'] ?? '').toString().trim();
-        final body = (decoded['body'] ?? '').toString().trim();
-        final expires = (decoded['expires'] ?? '').toString().trim();
-        if (id.isEmpty || id == seen) return;
-        if (title.isEmpty && body.isEmpty) return;
-        if (expires.isNotEmpty) {
-          final expiry = DateTime.tryParse(expires);
-          if (expiry != null && expiry.isBefore(DateTime.now())) return;
+        final prefs = await SharedPreferences.getInstance();
+        final cached = prefs.getString(_noticeCacheKey);
+        if (cached != null && cached.isNotEmpty) {
+          final decoded = jsonDecode(cached);
+          if (decoded is Map) {
+            await _considerNotice(decoded, fromCache: true);
+          }
         }
-        if (!mounted) return;
-        setState(() => _notice = _Notice(id, title, body));
-        await _noticeCtrl.forward();
-        // Shown once: record the ID as seen the moment it displayed.
-        try {
-          await prefs.setString(_seenNoticeKey, id);
-        } catch (_) {}
-        _noticeTimer = Timer(const Duration(seconds: 5), _hideNotice);
-      } finally {
-        client.close(force: true);
-      }
+      } catch (_) {}
+      // 2. Live fetch from both sources.
+      final ok = await _fetchNotices();
+      if (!ok) _scheduleNoticeRetries();
     } catch (_) {
       // No network, bad file, anything — the box simply never appears.
+    } finally {
+      _checkingNotice = false;
     }
+  }
+
+  void _scheduleNoticeRetries() {
+    if (_noticeRetryTimers.any((t) => t.isActive)) return;
+    _noticeRetryTimers = [
+      Timer(const Duration(seconds: 15), () => _fetchNotices()),
+      Timer(const Duration(seconds: 45), () => _fetchNotices()),
+    ];
+  }
+
+  /// Tries jsDelivr first, then raw GitHub (raw is processed second
+  /// because it is fresher — a different ID there wins the cache).
+  /// Returns true if at least one source answered.
+  Future<bool> _fetchNotices() async {
+    var anySuccess = false;
+    try {
+      final a = await _fetchNoticeJson(_noticesUrlJsDelivr);
+      if (a != null) {
+        anySuccess = true;
+        await _considerNotice(a);
+      }
+      final b = await _fetchNoticeJson(_noticesUrlRaw);
+      if (b != null) {
+        anySuccess = true;
+        await _considerNotice(b);
+      }
+    } catch (_) {}
+    return anySuccess;
+  }
+
+  Future<Map<String, dynamic>?> _fetchNoticeJson(String url) async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
+    try {
+      final request = await client.getUrl(Uri.parse(url)).timeout(const Duration(seconds: 4));
+      final response = await request.close().timeout(const Duration(seconds: 4));
+      if (response.statusCode != 200) return null;
+      final raw = await response.transform(utf8.decoder).join().timeout(const Duration(seconds: 4));
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      return null;
+    } catch (_) {
+      return null;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  /// The one place every notice (cached or fresh) is judged: empty
+  /// ID clears the cache and shows nothing; expired is ignored; a
+  /// valid fresh notice replaces the cache; an unseen one shows —
+  /// unless a box is already on screen, in which case the fresher
+  /// one simply stays cached for the next check.
+  Future<void> _considerNotice(Map<dynamic, dynamic> decoded, {bool fromCache = false}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final id = (decoded['id'] ?? '').toString().trim();
+      if (id.isEmpty) {
+        if (!fromCache) {
+          try {
+            await prefs.remove(_noticeCacheKey);
+          } catch (_) {}
+        }
+        return;
+      }
+      final title = (decoded['title'] ?? '').toString().trim();
+      final body = (decoded['body'] ?? '').toString().trim();
+      final expires = (decoded['expires'] ?? '').toString().trim();
+      if (title.isEmpty && body.isEmpty) return;
+      if (expires.isNotEmpty) {
+        final expiry = DateTime.tryParse(expires);
+        if (expiry != null && expiry.isBefore(DateTime.now())) return;
+      }
+      if (!fromCache) {
+        try {
+          await prefs.setString(_noticeCacheKey, jsonEncode(decoded));
+        } catch (_) {}
+      }
+      final seen = prefs.getString(_seenNoticeKey) ?? '';
+      if (id == seen) return;
+      if (!mounted || _notice != null) return;
+      setState(() => _notice = _Notice(id, title, body));
+      await _noticeCtrl.forward();
+      // Shown once: record the ID as seen the moment it displayed.
+      try {
+        await prefs.setString(_seenNoticeKey, id);
+      } catch (_) {}
+      _noticeTimer?.cancel();
+      _noticeTimer = Timer(const Duration(seconds: 5), _hideNotice);
+    } catch (_) {}
   }
 
   Future<void> _hideNotice() async {

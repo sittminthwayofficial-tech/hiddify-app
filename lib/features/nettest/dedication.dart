@@ -122,16 +122,24 @@ class DedicationSplash extends StatelessWidget {
           child: Stack(
             children: [
               // soft glow rings, centered a little above middle
-              Align(
-                alignment: const Alignment(0, -0.14),
-                child: Container(
-                  width: 340 * s,
-                  height: 340 * s,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [Color(0xFF161D42), Color(0xFF121838), Color(0x000A0E27)],
-                      stops: [0.45, 0.75, 1],
+              // NetTest VPN v1.3.1: the whole STATIC composition (this
+              // glow + the emblem/title/rules block below) sits behind
+              // RepaintBoundarys, so the gradient and blur layers
+              // rasterize ONCE and are never repainted per frame while
+              // the dedication line slides. The line itself stays
+              // outside every RepaintBoundary.
+              RepaintBoundary(
+                child: Align(
+                  alignment: const Alignment(0, -0.14),
+                  child: Container(
+                    width: 340 * s,
+                    height: 340 * s,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [Color(0xFF161D42), Color(0xFF121838), Color(0x000A0E27)],
+                        stops: [0.45, 0.75, 1],
+                      ),
                     ),
                   ),
                 ),
@@ -141,39 +149,46 @@ class DedicationSplash extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 148 * s,
-                      height: 148 * s,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: nettestGold, width: 1.6),
+                    RepaintBoundary(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 148 * s,
+                            height: 148 * s,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: nettestGold, width: 1.6),
+                            ),
+                            child: Padding(
+                              padding: EdgeInsets.all(34 * s),
+                              child: CustomPaint(painter: _BoltPainter()),
+                            ),
+                          ),
+                          SizedBox(height: 20 * s),
+                          Text(
+                            'NETTEST VPN',
+                            style: TextStyle(
+                              color: nettestSoftViolet,
+                              fontSize: 15 * s,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 8 * s,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                          SizedBox(height: 30 * s),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(width: 74 * s, height: 1.2, color: nettestGold),
+                              SizedBox(width: 14 * s),
+                              _Diamond(size: 8 * s),
+                              SizedBox(width: 14 * s),
+                              Container(width: 74 * s, height: 1.2, color: nettestGold),
+                            ],
+                          ),
+                        ],
                       ),
-                      child: Padding(
-                        padding: EdgeInsets.all(34 * s),
-                        child: CustomPaint(painter: _BoltPainter()),
-                      ),
-                    ),
-                    SizedBox(height: 20 * s),
-                    Text(
-                      'NETTEST VPN',
-                      style: TextStyle(
-                        color: nettestSoftViolet,
-                        fontSize: 15 * s,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 8 * s,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                    SizedBox(height: 30 * s),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(width: 74 * s, height: 1.2, color: nettestGold),
-                        SizedBox(width: 14 * s),
-                        _Diamond(size: 8 * s),
-                        SizedBox(width: 14 * s),
-                        Container(width: 74 * s, height: 1.2, color: nettestGold),
-                      ],
                     ),
                     SizedBox(height: 14 * s),
                     SizedBox(
@@ -236,7 +251,17 @@ class _NettestSplashGateState extends State<NettestSplashGate> with TickerProvid
   late final AnimationController _line;
   late final Animation<double> _lineAnim;
   Timer? _fallback;
+  Timer? _mountTimer;
   bool _gone = false;
+
+  /// NetTest VPN v1.3.1 — deferred child mount. Device diagnosis
+  /// (2026-11-06) CONFIRMED the slide stutter is startup contention:
+  /// the whole app used to build underneath the splash during the
+  /// slide window. The child now stays OUT of the tree until the
+  /// line slide completes (~1.55 s), then mounts UNDER the splash
+  /// and builds while the (static) splash covers it, until the gate
+  /// lifts on the unchanged 2.9 s / 4 s timings.
+  bool _childMounted = false;
 
   @override
   void initState() {
@@ -246,12 +271,25 @@ class _NettestSplashGateState extends State<NettestSplashGate> with TickerProvid
       if (status == AnimationStatus.completed) _dismiss();
     });
     _line = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500));
+    _line.addStatusListener((status) {
+      if (status == AnimationStatus.completed) _mountChild();
+    });
     _lineAnim = CurvedAnimation(parent: _line, curve: Curves.easeOutCubic);
     _gate.forward();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _line.forward();
+      if (!mounted) return;
+      _line.forward();
+      // Belt-and-braces alongside the slide-completion listener:
+      // mount the child ~1.55 s after the slide starts, whichever
+      // path fires first (the call is idempotent).
+      _mountTimer = Timer(const Duration(milliseconds: 1550), _mountChild);
     });
     _fallback = Timer(const Duration(seconds: 4), _dismiss);
+  }
+
+  void _mountChild() {
+    if (!mounted || _childMounted) return;
+    setState(() => _childMounted = true);
   }
 
   void _dismiss() {
@@ -262,6 +300,7 @@ class _NettestSplashGateState extends State<NettestSplashGate> with TickerProvid
   @override
   void dispose() {
     _fallback?.cancel();
+    _mountTimer?.cancel();
     _gate.dispose();
     _line.dispose();
     super.dispose();
@@ -272,7 +311,10 @@ class _NettestSplashGateState extends State<NettestSplashGate> with TickerProvid
     if (_gone) return widget.child;
     return Stack(
       children: [
-        IgnorePointer(child: widget.child),
+        // Absent from the tree during the slide window (see
+        // _childMounted above); once mounted it builds under the
+        // splash, input still blocked by the splash's AbsorbPointer.
+        if (_childMounted) IgnorePointer(child: widget.child),
         Positioned.fill(
           child: AbsorbPointer(
             child: AnimatedBuilder(
@@ -280,7 +322,14 @@ class _NettestSplashGateState extends State<NettestSplashGate> with TickerProvid
               child: DedicationSplash(lineAnimation: _lineAnim),
               builder: (context, child) {
                 final v = _gate.value;
-                final gateOpacity = v < 0.88 ? 1.0 : 1.0 - ((v - 0.88) / 0.12);
+                // NetTest VPN v1.3.1: NO full-screen Opacity during
+                // the slide window — a per-frame opacity over the
+                // whole splash forces a full-screen layer save on
+                // every frame of the slide. The splash is built
+                // directly until the outro; only the final ~200 ms
+                // of the 2900 ms gate (v >= 0.931) fades.
+                if (v < 0.931) return child!;
+                final gateOpacity = 1.0 - ((v - 0.931) / 0.069);
                 return Opacity(
                   opacity: gateOpacity.clamp(0, 1),
                   child: child,
