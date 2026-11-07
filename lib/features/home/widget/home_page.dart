@@ -5,6 +5,7 @@ import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/home/widget/connection_button.dart';
+import 'package:hiddify/features/nettest/mask_section.dart';
 import 'package:hiddify/features/nettest/nettest_home_overlays.dart';
 import 'package:hiddify/features/nettest/nettest_layout.dart';
 import 'package:hiddify/features/nettest/nettest_servers_slivers.dart';
@@ -37,7 +38,10 @@ class HomePage extends HookConsumerWidget {
         //     : null,
         title: Row(
           children: [
-            Assets.images.logo.svg(height: 24),
+            // NetTest VPN v1.4: the header logo doubles as the
+            // hidden door to the disguise section — a 5-second
+            // continuous hold + the lock gate. Visually identical.
+            MaskDoorEntry(child: Assets.images.logo.svg(height: 24)),
             const Gap(8),
             Text.rich(
               TextSpan(

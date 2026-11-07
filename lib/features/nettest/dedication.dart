@@ -3,6 +3,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'package:hiddify/features/nettest/mask_root.dart';
+
 /// NetTest VPN v1.1 — the dedication: "A gift for Daw Thae".
 ///
 /// Locked design (Alex, 2026-11-05 20:09, layout v4): on the splash page
@@ -308,6 +310,10 @@ class _NettestSplashGateState extends State<NettestSplashGate> with TickerProvid
 
   @override
   Widget build(BuildContext context) {
+    // NetTest VPN v1.4: while the real UI is shown as an unlocked
+    // DISGUISE session, MaskRoot suppresses the splash entirely —
+    // it must never replay over an unlock.
+    if (MaskScope.suppressSplashOf(context)) return widget.child;
     if (_gone) return widget.child;
     return Stack(
       children: [

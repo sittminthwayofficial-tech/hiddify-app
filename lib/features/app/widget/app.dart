@@ -18,6 +18,7 @@ import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/app_update/notifier/app_update_notifier.dart';
 import 'package:hiddify/features/connection/widget/connection_wrapper.dart';
 import 'package:hiddify/features/nettest/dedication.dart';
+import 'package:hiddify/features/nettest/mask_root.dart';
 import 'package:hiddify/features/nettest/nettest_providers.dart';
 import 'package:hiddify/features/per_app_proxy/overview/per_app_proxy_service_notifier.dart';
 import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart';
@@ -104,6 +105,12 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                     );
                     // NetTest VPN v1.1: dedication splash (cold start only).
                     child = NettestSplashGate(child: child);
+                    // NetTest VPN v1.4: DISGUISE root switch. Mask OFF
+                    // (default) renders the tree above untouched; mask
+                    // ON swaps in the MovieLand facade (the splash
+                    // gate never builds, so the dedication is skipped)
+                    // until the hidden door + lock open the real UI.
+                    child = MaskRoot(child: child);
                     if (kDebugMode && _debugAccessibility) {
                       return AccessibilityTools(checkFontOverflows: true, child: child);
                     }

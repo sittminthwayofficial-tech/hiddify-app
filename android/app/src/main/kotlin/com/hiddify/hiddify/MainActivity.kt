@@ -47,6 +47,8 @@ class MainActivity : FlutterFragmentActivity(), ServiceConnection.Callback {
         reconnect()
         flutterEngine.plugins.add(MethodHandler(lifecycleScope))
         flutterEngine.plugins.add(PlatformSettingsHandler())
+        // NetTest VPN v1.4 (DISGUISE): FLAG_SECURE + launcher-alias channel.
+        flutterEngine.plugins.add(MaskChannel())
         flutterEngine.plugins.add(EventHandler())
         flutterEngine.plugins.add(LogHandler())
 //        flutterEngine.plugins.add(GroupsChannel(lifecycleScope))
